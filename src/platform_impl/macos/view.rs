@@ -452,7 +452,7 @@ extern "C" fn insert_text(this: &Object, _sel: Sel, string: id, _replacement_ran
         //let event: id = msg_send![NSApp(), currentEvent];
 
         let mut events = VecDeque::with_capacity(characters.len());
-        for character in string.chars() {
+        for character in string.chars().filter(|c| !is_private_use_character(*c)) {
             events.push_back(Event::WindowEvent {
                 window_id: WindowId(get_window_id(state.ns_window)),
                 event: WindowEvent::ReceivedCharacter(character),
@@ -484,7 +484,10 @@ extern "C" fn do_command_by_selector(this: &Object, _sel: Sel, command: Sel) {
         } else {
             let raw_characters = state.raw_characters.take();
             if let Some(raw_characters) = raw_characters {
-                for character in raw_characters.chars() {
+                for character in raw_characters
+                    .chars()
+                    .filter(|c| !is_private_use_character(*c))
+                {
                     events.push_back(Event::WindowEvent {
                         window_id: WindowId(get_window_id(state.ns_window)),
                         event: WindowEvent::ReceivedCharacter(character),
@@ -512,6 +515,14 @@ fn get_characters(event: id, ignore_modifiers: bool) -> String {
 
         let string = str::from_utf8_unchecked(slice);
         string.to_owned()
+    }
+}
+
+// As defined in: http://www.unicode.org/faq/private_use.html
+fn is_private_use_character(c: char) -> bool {
+    match c {
+        '\u{E000}'..='\u{F8FF}' | '\u{F0000}'..='\u{FFFFD}' | '\u{100000}'..='\u{10FFFD}' => true,
+        _ => false,
     }
 }
 
@@ -571,7 +582,7 @@ extern "C" fn key_down(this: &Object, _sel: Sel, event: id) {
             AppState::queue_event(window_event);
             // Emit `ReceivedCharacter` for key repeats
             if is_repeat && state.is_key_down {
-                for character in characters.chars() {
+                for character in characters.chars().filter(|c| !is_private_use_character(*c)) {
                     AppState::queue_event(Event::WindowEvent {
                         window_id,
                         event: WindowEvent::ReceivedCharacter(character),
