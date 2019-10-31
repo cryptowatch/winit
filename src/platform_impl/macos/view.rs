@@ -452,7 +452,7 @@ extern "C" fn insert_text(this: &Object, _sel: Sel, string: id, _replacement_ran
         //let event: id = msg_send![NSApp(), currentEvent];
 
         let mut events = VecDeque::with_capacity(characters.len());
-        for character in string.chars() {
+        for character in string.chars().filter(|c| !is_corporate_character(*c)) {
             events.push_back(Event::WindowEvent {
                 window_id: WindowId(get_window_id(state.ns_window)),
                 event: WindowEvent::ReceivedCharacter(character),
@@ -484,7 +484,10 @@ extern "C" fn do_command_by_selector(this: &Object, _sel: Sel, command: Sel) {
         } else {
             let raw_characters = state.raw_characters.take();
             if let Some(raw_characters) = raw_characters {
-                for character in raw_characters.chars() {
+                for character in raw_characters
+                    .chars()
+                    .filter(|c| !is_corporate_character(*c))
+                {
                     events.push_back(Event::WindowEvent {
                         window_id: WindowId(get_window_id(state.ns_window)),
                         event: WindowEvent::ReceivedCharacter(character),
@@ -515,15 +518,27 @@ fn get_characters(event: id, ignore_modifiers: bool) -> String {
     }
 }
 
+// As defined in: https://www.unicode.org/Public/MAPPINGS/VENDORS/APPLE/CORPCHAR.TXT
+fn is_corporate_character(c: char) -> bool {
+    match c {
+        '\u{F700}'...'\u{F747}'
+        | '\u{F802}'...'\u{F84F}'
+        | '\u{F850}'
+        | '\u{F85C}'
+        | '\u{F85D}'
+        | '\u{F85F}'
+        | '\u{F860}'...'\u{F86B}'
+        | '\u{F870}'...'\u{F8FF}' => true,
+        _ => false,
+    }
+}
+
 // Retrieves a layout-independent keycode given an event.
 fn retrieve_keycode(event: id) -> Option<VirtualKeyCode> {
     #[inline]
     fn get_code(ev: id, raw: bool) -> Option<VirtualKeyCode> {
         let characters = get_characters(ev, raw);
-        characters
-            .chars()
-            .next()
-            .map_or(None, |c| char_to_keycode(c))
+        characters.chars().next().and_then(|c| char_to_keycode(c))
     }
 
     // Cmd switches Roman letters for Dvorak-QWERTY layout, so we try modified characters first.
@@ -574,7 +589,7 @@ extern "C" fn key_down(this: &Object, _sel: Sel, event: id) {
             AppState::queue_event(window_event);
             // Emit `ReceivedCharacter` for key repeats
             if is_repeat && state.is_key_down {
-                for character in characters.chars() {
+                for character in characters.chars().filter(|c| !is_corporate_character(*c)) {
                     AppState::queue_event(Event::WindowEvent {
                         window_id,
                         event: WindowEvent::ReceivedCharacter(character),
