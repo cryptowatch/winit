@@ -32,9 +32,8 @@ use crate::{
 };
 use cocoa::{
     appkit::{
-        self, CGFloat, NSApp, NSApplication, NSApplicationActivationPolicy,
-        NSApplicationPresentationOptions, NSColor, NSRequestUserAttentionType, NSScreen, NSView,
-        NSWindow, NSWindowButton, NSWindowStyleMask,
+        self, CGFloat, NSApp, NSApplication, NSApplicationPresentationOptions, NSColor,
+        NSRequestUserAttentionType, NSScreen, NSView, NSWindow, NSWindowButton, NSWindowStyleMask,
     },
     base::{id, nil},
     foundation::{NSAutoreleasePool, NSDictionary, NSPoint, NSRect, NSSize},
@@ -92,19 +91,14 @@ impl Default for PlatformSpecificWindowBuilderAttributes {
     }
 }
 
-fn create_app(activation_policy: ActivationPolicy) -> Option<id> {
+fn create_app(_activation_policy: ActivationPolicy) -> Option<id> {
     unsafe {
         let ns_app = NSApp();
         if ns_app == nil {
             None
         } else {
-            use self::NSApplicationActivationPolicy::*;
-            ns_app.setActivationPolicy_(match activation_policy {
-                ActivationPolicy::Regular => NSApplicationActivationPolicyRegular,
-                ActivationPolicy::Accessory => NSApplicationActivationPolicyAccessory,
-                ActivationPolicy::Prohibited => NSApplicationActivationPolicyProhibited,
-            });
             ns_app.finishLaunching();
+
             Some(ns_app)
         }
     }

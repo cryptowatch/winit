@@ -1,5 +1,12 @@
 use super::{activation_hack, app_state::AppState};
-use cocoa::base::id;
+use cocoa::base::{id, nil, selector};
+use cocoa::{
+    appkit::{
+        NSApplication, NSApplicationActivateIgnoringOtherApps, NSApplicationActivationPolicy,
+        NSMenu, NSMenuItem, NSRunningApplication,
+    },
+    foundation::{NSAutoreleasePool, NSProcessInfo, NSString},
+};
 use objc::{
     declare::ClassDecl,
     runtime::{Class, Object, Sel},
@@ -61,6 +68,39 @@ extern "C" fn dealloc(this: &Object, _: Sel) {
 extern "C" fn did_finish_launching(_: &Object, _: Sel, _: id) {
     trace!("Triggered `applicationDidFinishLaunching`");
     AppState::launched();
+
+    unsafe {
+        let ns_app = NSApplication::sharedApplication(nil);
+
+        // Create menu bar
+        let menubar = NSMenu::new(nil).autorelease();
+        let app_menu_item = NSMenuItem::new(nil).autorelease();
+        menubar.addItem_(app_menu_item);
+        ns_app.setMainMenu_(menubar);
+
+        // Create Application menu
+        let app_menu = NSMenu::new(nil).autorelease();
+        let quit_prefix = NSString::alloc(nil).init_str("Quit ");
+        let quit_title =
+            quit_prefix.stringByAppendingString_(NSProcessInfo::processInfo(nil).processName());
+        let quit_action = selector("terminate:");
+        let quit_key = NSString::alloc(nil).init_str("q");
+        let quit_item = NSMenuItem::alloc(nil)
+            .initWithTitle_action_keyEquivalent_(quit_title, quit_action, quit_key)
+            .autorelease();
+        app_menu.addItem_(quit_item);
+        app_menu_item.setSubmenu_(app_menu);
+    }
+
+    use self::NSApplicationActivationPolicy::*;
+
+    unsafe {
+        let ns_app = NSApplication::sharedApplication(nil);
+        ns_app.setActivationPolicy_(NSApplicationActivationPolicyRegular);
+
+        let current_app = NSRunningApplication::currentApplication(nil);
+        current_app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps);
+    }
     trace!("Completed `applicationDidFinishLaunching`");
 }
 
